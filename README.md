@@ -40,13 +40,8 @@ Generate the dataset and run preprocessing and model training:
 
 ## Results
 <img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/48e80265-874a-4912-9bed-389235635b5f" width=50% >
-<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4cdf27b7-6933-46fa-9976-183323239f06" width=33% height=33%>
-<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4513a4af-5ba2-4854-b9cb-38c8b57cf85e" width=33% height=33%>
+<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4cdf27b7-6933-46fa-9976-183323239f06" width=50% >
+<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4513a4af-5ba2-4854-b9cb-38c8b57cf85e" height=33%>
 
 
-
-
-![Model ROC Curve](path_to_roc_curve_image.png)
-![Feature Importance](path_to_feature_importance.png)
-![Confusion Matrix](path_to_confusion_matrix.png)
 
