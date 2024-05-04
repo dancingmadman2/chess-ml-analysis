@@ -47,9 +47,12 @@ python main.py
 **These results were obtained using a Random Forest model with a 75-25 training-test split on a dataset consisting of 2,500 entries.**
 <br>
 <br>
+<p align="center">
 <img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/48e80265-874a-4912-9bed-389235635b5f" width=40% >
 <img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4cdf27b7-6933-46fa-9976-183323239f06" width=40% >
+</p>
+<p align="center">
 <img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4513a4af-5ba2-4854-b9cb-38c8b57cf85e" width=60%>
-
+</p>
 
 
