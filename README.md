@@ -52,7 +52,8 @@ python main.py
 <img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4cdf27b7-6933-46fa-9976-183323239f06" width=40% >
 </p>
 <p align="center">
-<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4513a4af-5ba2-4854-b9cb-38c8b57cf85e" width=60%>
+<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/4513a4af-5ba2-4854-b9cb-38c8b57cf85e" width=40%>
+<img src="https://github.com/dancingmadman2/chess-ml-analysis/assets/88443368/bb53b603-af40-4436-8519-336e6b98b01b" width=40%>
 </p>
 
 
