@@ -4,10 +4,11 @@ import chess.pgn
 import chess.polyglot
 import csv
 import random
+import os
 
 # Path to your Stockfish executable
-STOCKFISH_PATH = 'C:/Users/ataka/Documents/schule/stockfish/stockfish-windows-x86-64-avx2.exe'
-OPENING_BOOK_PATH = 'C:/Users/ataka/Documents/schule/gm2001.bin'
+STOCKFISH_PATH = os.environ.get('STOCKFISH_PATH')
+OPENING_BOOK_PATH = os.environ.get('OPENING_BOOK_PATH')
 
 # Initiliaze the Chess Engine
 engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
@@ -90,13 +91,6 @@ openings_tree = {
 }
 
 
-def get_opening(moves):
-    for length in range(1, min(3, len(moves)) + 1):  # Check up to the first three moves or fewer if not available
-        parsed_moves = ' '.join(str(move) for move in moves[:length])
-        if parsed_moves in opening_dict:
-            return opening_dict[parsed_moves]
-    return "Unknown"
-
 def get_opening_from_tree(moves, opening_tree):
     current_dict = opening_tree
     last_known_opening = "Unknown"  # Track the last known opening
@@ -153,46 +147,131 @@ def count_sacrifices(board):
     
     return white_sacrifices, black_sacrifices
 
-def calculate_control(board):
-    """Calculate control of central and key squares by each player."""
-    central_squares = [chess.D4, chess.D5, chess.E4, chess.E5]
-    white_control = 0
-    black_control = 0
+def track_piece_counts(board):
+    """Tracks the counts of knights and bishops on each side."""
+    white_knights = len(board.pieces(chess.KNIGHT, chess.WHITE))
+    white_bishops = len(board.pieces(chess.BISHOP, chess.WHITE))
+    black_knights = len(board.pieces(chess.KNIGHT, chess.BLACK))
+    black_bishops = len(board.pieces(chess.BISHOP, chess.BLACK))
+    return {
+        "white_knights": white_knights,
+        "white_bishops": white_bishops,
+        "black_knights": black_knights,
+        "black_bishops": black_bishops
+    }
+import chess
 
-    for square in central_squares:
-        white_control += len(board.attackers(chess.WHITE, square))
-        black_control += len(board.attackers(chess.BLACK, square))
-
-    return white_control, black_control
-
-def average_positional_imbalance(moves):
-    """Calculate average imbalance over the course of a game."""
+def control_of_center(moves):
     board = chess.Board()
-    imbalances = []
-    total_imbalance = 0
-    num_evaluated_positions = 0
-
+    center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
+    white_control_scores = []
+    black_control_scores = []
+    
     for move in moves:
         board.push(move)
-        white_control, black_control = calculate_control(board)
-        imbalance = abs(white_control - black_control)
-        imbalances.append(imbalance)
-        total_imbalance += imbalance
-        num_evaluated_positions += 1
+        white_control = 0
+        black_control = 0
+        for square in center_squares:
+            if board.is_attacked_by(chess.WHITE, square):
+                white_control += 1
+            if board.is_attacked_by(chess.BLACK, square):
+                black_control += 1
+        white_control_scores.append(white_control)
+        black_control_scores.append(black_control)
 
-    if num_evaluated_positions > 0:
-        average_imbalance = total_imbalance / num_evaluated_positions
+    # Calculate average control
+    avg_white_control = sum(white_control_scores) / len(white_control_scores) if white_control_scores else 0
+    avg_black_control = sum(black_control_scores) / len(black_control_scores) if black_control_scores else 0
+
+    return avg_white_control, avg_black_control
+
+
+def calculate_piece_activity(moves):
+    board = chess.Board()
+    white_control_counts = []
+    black_control_counts = []
+    
+    for move in moves:
+        board.push(move)
+        white_control = 0
+        black_control = 0
+        
+        # Loop over all squares and check if they are attacked by white or black
+        for square in chess.SQUARES:
+            if board.is_attacked_by(chess.WHITE, square):
+                white_control += 1
+            if board.is_attacked_by(chess.BLACK, square):
+                black_control += 1
+                
+        white_control_counts.append(white_control)
+        black_control_counts.append(black_control)
+
+    # Calculate average control for white and black
+    avg_white_control = sum(white_control_counts) / len(white_control_counts) if white_control_counts else 0
+    avg_black_control = sum(black_control_counts) / len(black_control_counts) if black_control_counts else 0
+
+    return avg_white_control, avg_black_control
+
+def average_piece_evaluation(moves, evaluation_interval):
+    """Evaluates the average number of knights and bishops every 'evaluation_interval' moves."""
+    board = chess.Board()
+    counts = []
+    for i, move in enumerate(moves):
+        board.push(move)
+        if (i + 1) % evaluation_interval == 0 or (i + 1) == len(moves):
+            counts.append(track_piece_counts(board))
+
+    # Initialize sums
+    sum_counts = {
+        "white_knights": 0,
+        "white_bishops": 0,
+        "black_knights": 0,
+        "black_bishops": 0
+    }
+
+    # Sum all counts
+    for count in counts:
+        for key in sum_counts:
+            sum_counts[key] += count[key]
+
+    # Calculate averages
+    num_evaluations = len(counts)
+    if num_evaluations > 0:
+        avg_counts = {key: value / num_evaluations for key, value in sum_counts.items()}
     else:
-        average_imbalance = 0  # In case of no moves
+        avg_counts = sum_counts  # Avoid division by zero; only possible if moves are fewer than interval and none evaluated
 
-    return average_imbalance
+        # Sum all counts
+    for count in counts:
+        for key in sum_counts:
+            sum_counts[key] += count[key]
+
+    # Calculate averages and ratios
+    num_evaluations = len(counts)
+    if num_evaluations > 0:
+        avg_counts = {key: value / num_evaluations for key, value in sum_counts.items()}
+        white_knight_to_bishop_ratio = avg_counts["white_knights"] / avg_counts["white_bishops"] if avg_counts["white_bishops"] != 0 else float('inf')
+        black_knight_to_bishop_ratio = avg_counts["black_knights"] / avg_counts["black_bishops"] if avg_counts["black_bishops"] != 0 else float('inf')
+    else:
+        # Avoid division by zero; only possible if moves are fewer than interval and none evaluated
+        white_knight_to_bishop_ratio = float('inf')
+        black_knight_to_bishop_ratio = float('inf')
+
+    return white_knight_to_bishop_ratio, black_knight_to_bishop_ratio
+
 
 def get_evaluation_score(board, engine, depth):
     # Get the evaluation score from Stockfish
-    info = engine.analyse(board, chess.engine.Limit(depth= depth))
-    
-    score = info["score"].white().score()/100  # Normalize score for white's perspective
+    info = engine.analyse(board, chess.engine.Limit(depth=depth))
+    try:
+        score = info["score"].white().score() / 100  # Normalize score for white's perspective
+        print(score)
+    except Exception as e:
+        # Handle any exceptions that occur during calculation
+        score=0
+        print(f"Error occurred: {e}")
     return score
+
 
 def has_castled(moves, is_white):
     king_square = 'e1' if is_white else 'e8'
@@ -219,11 +298,46 @@ def has_castled(moves, is_white):
     return False
 
 
+def opposite_side_castling(moves):
+    # Initialize castling flags for both colors
+    white_kingside = False
+    white_queenside = False
+    black_kingside = False
+    black_queenside = False
+
+    # Split moves into a list for analysis
+    move_list = moves.split()
+
+    # Check for white and black castling in the move list
+    for move in move_list:
+        src_square = move[:2]
+        target_square = move[2:4]
+
+        # Check for White's castling
+        if src_square == 'e1':
+            if target_square == 'g1':
+                white_kingside = True
+            elif target_square == 'c1':
+                white_queenside = True
+
+        # Check for Black's castling
+        if src_square == 'e8':
+            if target_square == 'g8':
+                black_kingside = True
+            elif target_square == 'c8':
+                black_queenside = True
+
+    # Determine if opposite side castling occurred
+    if (white_kingside and black_queenside) or (white_queenside and black_kingside):
+        return True  # Opposite side castling occurred
+    else:
+        return False  # No opposite side castling
+
+
 def play_game(engine, white_skill, black_skill):
     board = chess.Board()
     moves = []
-    eval_after_move_10 = None
-    eval_after_move_20 = None
+    eval_after_move_15= None
     # Apply skill level settings
     engine.configure({"Skill Level": white_skill})  # Set skill level for White
 
@@ -251,18 +365,18 @@ def play_game(engine, white_skill, black_skill):
 
             board.push(move)
             moves.append(move)
-            if len(moves) == 10:
-                eval_after_move_10 = get_evaluation_score(board, engine, 16)
-            elif len(moves) == 20:
-                eval_after_move_20 = get_evaluation_score(board, engine, 16)
+        
+                
 
+            if len(moves) == 15:
+                eval_after_move_15 = get_evaluation_score(board, engine, 12)
 
     game = chess.pgn.Game.from_board(board)
     game.headers["Result"] = board.result()
-    return game, board, moves, eval_after_move_10, eval_after_move_20
+    return game, board, moves, eval_after_move_15 
 
 # Function to extract features from a game
-def extract_features(game, board, moves, white_skill, black_skill, eval_after_move_10, eval_after_move_20):
+def extract_features(game, board, moves, white_skill, black_skill, eval_after_move_15):
     game_info = {}
     game_info['result'] = board.result()
     game_info['total_moves'] = board.fullmove_number
@@ -271,40 +385,47 @@ def extract_features(game, board, moves, white_skill, black_skill, eval_after_mo
     #game_info['white_rating'] = random.randint(1000, 2000)
     #game_info['black_rating'] = random.randint(1000, 2000)
     game_info['white_skill'] = white_skill
-    game_info['black_skill'] = black_skill
-    game_info['first_three_moves'] = ' '.join(str(move) for move in moves)   # Record first three moves
+    game_info['black_skill']= black_skill
+    #game_info['moves'] = ' '.join(str(move) for move in moves)   # Record first three moves
     
     parsed_moves = ' '.join(str(move) for move in moves)
     # Check if white has castled
     game_info['white_castled'] = has_castled(parsed_moves, is_white=True)
-    game_info['overall_imbalance'] = average_positional_imbalance(moves)
-   
-    # Check if black has castled
+    game_info['w_knight_to_bishop'], game_info['b_knight_to_bishop'] = average_piece_evaluation(moves, evaluation_interval=3)
+    game_info['w_center_control'], game_info['b_center_control'] = control_of_center(moves)
+    # Check if black has castled:
     game_info['black_castled'] = has_castled(parsed_moves, is_white=False)
+    game_info['opposite_side_castle'] = opposite_side_castling(parsed_moves)
+    game_info['white_piece_activity'], game_info['black_piece_activity'] = calculate_piece_activity(moves)
     game_info['white_sacrifices'], game_info['black_sacrifices'] = count_sacrifices(board)
-    game_info['eval_after_move_10'] = eval_after_move_10
-    game_info['eval_after_move_20'] = eval_after_move_20
+    game_info['eval_after_move_15'] = eval_after_move_15
+    
 
     return game_info
 
 # Main function to generate games and write to CSV
 def main():
-    with open('chess_games_dataset.csv', 'w', newline='') as file:
-        fieldnames = ['result', 'total_moves', 'opening', 'winner', 'white_skill', 'black_skill', 'first_three_moves', 'white_castled', 'black_castled', 'white_sacrifices', 'black_sacrifices', 'overall_imbalance', 'eval_after_move_10', 'eval_after_move_20']
+    with open('dataset.csv', 'w', newline='') as file:
+        fieldnames = ['result', 'total_moves', 'opening', 'winner', 'white_skill', 'black_skill', 'white_castled', 'black_castled', 'opposite_side_castle', 'white_sacrifices', 'black_sacrifices', 'w_knight_to_bishop', 'b_knight_to_bishop', 'w_center_control', 'b_center_control', 'white_piece_activity', 'black_piece_activity', 'eval_after_move_15']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        
-        for _ in range(15):  # Number of games to play
+    
+        for _ in range(2500):  # Number of games to play
            
-            #white_skill = random.randint(5,20)
+            white_skill = random.randint(5,20)
             #black_skill = random.randint(5,20)
-            white_skill = 12
-            black_skill = 12
-            game, board, moves, eval_after_move_10, eval_after_move_20 = play_game(engine, white_skill, black_skill)
-            features = extract_features(game, board, moves, white_skill, black_skill, eval_after_move_10, eval_after_move_20)
+            black_skill = white_skill
+            #white_skill = 12
+            #black_skill = 12
+            game, board, moves, eval_after_move_15 = play_game(engine, white_skill, black_skill)
+            features = extract_features(game, board, moves, white_skill, black_skill, eval_after_move_15)
             writer.writerow(features)
 
     engine.quit()
 
 if __name__ == "__main__":
     main()
+''' 
+Features:
+
+'''
